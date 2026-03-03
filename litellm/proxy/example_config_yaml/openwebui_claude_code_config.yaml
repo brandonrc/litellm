@@ -58,3 +58,6 @@ litellm_settings:
   # Without this, litellm routes openai-provider requests to the Responses API
   # (/v1/responses) which Open WebUI does not support.
   use_chat_completions_url_for_anthropic_messages: true
+  # Drop unsupported params (e.g. thinking, reasoning_effort) instead of
+  # erroring. Claude Code sends thinking params that Open WebUI doesn't support.
+  drop_params: true

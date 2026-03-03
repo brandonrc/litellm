@@ -52,6 +52,7 @@ general_settings:
 
 litellm_settings:
   use_chat_completions_url_for_anthropic_messages: true
+  drop_params: true
 ```
 
 **Key settings explained:**
@@ -64,6 +65,7 @@ litellm_settings:
 | `api_key: "placeholder"` | Required by LiteLLM schema but overridden per-request by the forwarded token |
 | `forward_llm_provider_auth_headers: true` | Forwards the client's `x-api-key` as the upstream API key (`Authorization: Bearer`) |
 | `use_chat_completions_url_for_anthropic_messages: true` | **Critical.** Without this, LiteLLM routes `openai` provider requests to the Responses API (`/v1/responses`) which Open WebUI does not support. This forces routing through `/v1/chat/completions` instead |
+| `drop_params: true` | **Critical.** Claude Code sends `thinking` params that get translated to `reasoning_effort`, which Open WebUI doesn't support. This silently drops unsupported params instead of returning 400 errors |
 
 ### Getting `api_base` right
 
@@ -120,6 +122,7 @@ general_settings:
 
 litellm_settings:
   use_chat_completions_url_for_anthropic_messages: true
+  drop_params: true
 ```
 
 ## Step 2: Start the Proxy
