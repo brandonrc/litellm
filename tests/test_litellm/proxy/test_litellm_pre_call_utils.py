@@ -1779,3 +1779,63 @@ async def test_bearer_token_not_in_debug_logs():
         f"Bearer token leaked in debug logs. "
         f"Found token in log output:\n{log_output[:500]}"
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("forward_llm_auth", [True, False])
+async def test_add_litellm_data_to_request_forwards_x_api_key_as_api_key(
+    forward_llm_auth,
+):
+    """
+    Test that when forward_llm_provider_auth_headers=True, the x-api-key header
+    from the client request is set as data["api_key"] so it can be used as the
+    API key for upstream provider calls (BYOK / Open WebUI passthrough).
+    """
+    from litellm.proxy.litellm_pre_call_utils import add_litellm_data_to_request
+
+    openwebui_token = "owui-test-token-12345"
+
+    request_mock = MagicMock(spec=Request)
+    request_mock.url.path = "/v1/messages"
+    request_mock.url = MagicMock()
+    request_mock.url.__str__.return_value = "http://localhost/v1/messages"
+    request_mock.method = "POST"
+    request_mock.query_params = {}
+    request_mock.headers = {
+        "content-type": "application/json",
+        "x-api-key": openwebui_token,
+    }
+    request_mock.client = MagicMock()
+    request_mock.client.host = "127.0.0.1"
+
+    data = {
+        "model": "claude-sonnet-4-20250514",
+        "messages": [{"role": "user", "content": "hello"}],
+        "max_tokens": 100,
+    }
+
+    user_api_key_dict = UserAPIKeyAuth(
+        api_key="hashed-key",
+        metadata={},
+        team_metadata={},
+    )
+
+    general_settings = {
+        "forward_llm_provider_auth_headers": forward_llm_auth,
+    }
+
+    updated_data = await add_litellm_data_to_request(
+        data=data,
+        request=request_mock,
+        user_api_key_dict=user_api_key_dict,
+        proxy_config=MagicMock(),
+        general_settings=general_settings,
+        version="test-version",
+    )
+
+    if forward_llm_auth:
+        # When forwarding is enabled, x-api-key should become the api_key
+        assert updated_data.get("api_key") == openwebui_token
+    else:
+        # When forwarding is disabled, api_key should not be set from headers
+        assert updated_data.get("api_key") is None

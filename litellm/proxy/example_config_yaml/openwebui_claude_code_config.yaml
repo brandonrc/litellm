@@ -1,0 +1,50 @@
+# Example config: Claude Code -> LiteLLM Proxy -> Open WebUI
+#
+# This config enables Claude Code to talk to an Open WebUI instance
+# that fronts LLM providers (e.g. AWS Bedrock).
+#
+# Architecture:
+#   Claude Code (Anthropic API format)
+#     -> LiteLLM Proxy (translates Anthropic -> OpenAI format)
+#       -> Open WebUI (OpenAI-compatible API, handles auth & routing)
+#         -> AWS Bedrock (or other backend)
+#
+# How it works:
+#   1. Claude Code sends Anthropic-format requests to LiteLLM's /v1/messages endpoint
+#   2. LiteLLM translates to OpenAI chat/completions format
+#   3. The engineer's x-api-key (ANTHROPIC_API_KEY) is forwarded as the
+#      Bearer token to Open WebUI for authentication
+#   4. Open WebUI routes to the backend LLM provider
+#
+# Engineer setup (Claude Code side):
+#   export ANTHROPIC_BASE_URL=https://litellm-proxy.internal.company.com
+#   export ANTHROPIC_API_KEY=<engineer's-open-webui-token>
+#
+# Then Claude Code just works - it talks Anthropic format to the proxy,
+# the proxy translates and forwards to Open WebUI with the engineer's token.
+
+model_list:
+  # Map Claude model names to the Open WebUI backend
+  # Use "openai/" prefix so LiteLLM sends OpenAI-format requests upstream
+  - model_name: claude-sonnet-4-20250514
+    litellm_params:
+      model: openai/claude-sonnet-4-20250514
+      api_base: https://openwebui.internal.company.com/api  # Open WebUI API base
+      api_key: "placeholder"  # Overridden per-request by forwarded x-api-key
+  - model_name: claude-opus-4-20250514
+    litellm_params:
+      model: openai/claude-opus-4-20250514
+      api_base: https://openwebui.internal.company.com/api
+      api_key: "placeholder"
+  # Wildcard: forward any claude model name
+  - model_name: claude-*
+    litellm_params:
+      model: openai/claude-*
+      api_base: https://openwebui.internal.company.com/api
+      api_key: "placeholder"
+
+general_settings:
+  # Forward the client's x-api-key header as the API key for upstream calls.
+  # This allows each engineer's Open WebUI token (sent as ANTHROPIC_API_KEY
+  # by Claude Code) to be forwarded as the Bearer token to Open WebUI.
+  forward_llm_provider_auth_headers: true

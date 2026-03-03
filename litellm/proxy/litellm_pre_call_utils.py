@@ -942,6 +942,16 @@ async def add_litellm_data_to_request(  # noqa: PLR0915
     ## Forward any LLM API Provider specific headers in extra_headers
     add_provider_specific_headers_to_request(data=data, headers=_headers)
 
+    ## Forward LLM provider auth key as api_key for upstream call (BYOK)
+    ## When forward_llm_provider_auth_headers is enabled, use the client's
+    ## x-api-key header value as the api_key for the upstream LLM provider call.
+    ## This enables Bring-Your-Own-Key flows where the client's auth token
+    ## (e.g. from Claude Code) is forwarded to the upstream provider (e.g. Open WebUI).
+    if forward_llm_auth:
+        _forwarded_api_key = _headers.get("x-api-key")
+        if _forwarded_api_key is not None:
+            data["api_key"] = _forwarded_api_key
+
     ## Cache Controls
     cache_control_header = _headers.get("Cache-Control", None)
     if cache_control_header:
