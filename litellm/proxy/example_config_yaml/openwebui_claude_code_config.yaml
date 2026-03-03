@@ -16,6 +16,13 @@
 #      Bearer token to Open WebUI for authentication
 #   4. Open WebUI routes to the backend LLM provider
 #
+# IMPORTANT: You must also set this env var when starting the proxy:
+#   export LITELLM_USE_CHAT_COMPLETIONS_URL_FOR_ANTHROPIC_MESSAGES=True
+#
+# Without it, litellm routes OpenAI-provider requests to the Responses API
+# (/v1/responses) which Open WebUI does not support. This flag forces routing
+# through /v1/chat/completions instead.
+#
 # Engineer setup (Claude Code side):
 #   export ANTHROPIC_BASE_URL=https://litellm-proxy.internal.company.com
 #   export ANTHROPIC_API_KEY=<engineer's-open-webui-token>
@@ -24,23 +31,27 @@
 # the proxy translates and forwards to Open WebUI with the engineer's token.
 
 model_list:
-  # Map Claude model names to the Open WebUI backend
-  # Use "openai/" prefix so LiteLLM sends OpenAI-format requests upstream
+  # Map Claude model names to the Open WebUI backend.
+  # Use "openai/" prefix so LiteLLM sends OpenAI-format requests upstream.
+  #
+  # NOTE on api_base: The OpenAI SDK appends /chat/completions to api_base.
+  # Open WebUI's OpenAI-compatible endpoint is at /api/v1/chat/completions,
+  # so api_base must end with /api/v1 (not /api).
   - model_name: claude-sonnet-4-20250514
     litellm_params:
       model: openai/claude-sonnet-4-20250514
-      api_base: https://openwebui.internal.company.com/api  # Open WebUI API base
+      api_base: https://openwebui.internal.company.com/api/v1
       api_key: "placeholder"  # Overridden per-request by forwarded x-api-key
   - model_name: claude-opus-4-20250514
     litellm_params:
       model: openai/claude-opus-4-20250514
-      api_base: https://openwebui.internal.company.com/api
+      api_base: https://openwebui.internal.company.com/api/v1
       api_key: "placeholder"
   # Wildcard: forward any claude model name
   - model_name: claude-*
     litellm_params:
       model: openai/claude-*
-      api_base: https://openwebui.internal.company.com/api
+      api_base: https://openwebui.internal.company.com/api/v1
       api_key: "placeholder"
 
 general_settings:
@@ -48,3 +59,8 @@ general_settings:
   # This allows each engineer's Open WebUI token (sent as ANTHROPIC_API_KEY
   # by Claude Code) to be forwarded as the Bearer token to Open WebUI.
   forward_llm_provider_auth_headers: true
+
+litellm_settings:
+  # Force routing through /v1/chat/completions instead of /v1/responses.
+  # This can also be set via LITELLM_USE_CHAT_COMPLETIONS_URL_FOR_ANTHROPIC_MESSAGES env var.
+  use_chat_completions_url_for_anthropic_messages: true
