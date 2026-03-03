@@ -30,7 +30,10 @@ to Open WebUI for per-user authentication.
 ## Prerequisites
 
 - Python 3.9+
-- LiteLLM installed with proxy extras: `pip install 'litellm[proxy]'`
+- LiteLLM installed from the fork (required for auth forwarding + Responses API fix):
+  ```bash
+  pip install 'git+https://github.com/brandonrc/litellm.git@feat/forward-x-api-key-as-upstream-api-key#egg=litellm[proxy]'
+  ```
 - Access to your org's Open WebUI instance
 - Each engineer needs their own Open WebUI API token (JWT from Open WebUI settings)
 
@@ -229,8 +232,18 @@ WebUI works directly" above). If that works but the proxy doesn't, check that
 **404 or "Not Found" from Open WebUI**: Your `api_base` is wrong. The SDK
 appends `/chat/completions` to it. See the "Getting `api_base` right" table.
 
-**Responses API errors / unexpected endpoint**: You forgot to set
-`use_chat_completions_url_for_anthropic_messages: true`. Without this, litellm
+**Responses API errors / unexpected endpoint (405 on `/v1/responses`)**: There
+are **two** code paths in litellm that can route requests to the Responses API:
+
+1. The main routing decision in the anthropic messages handler — controlled by
+   `use_chat_completions_url_for_anthropic_messages: true`.
+2. A secondary path where Claude Code's `thinking` params (always sent) cause
+   litellm to prepend `responses/` to the model name, which triggers the
+   Responses API bridge inside `completion()`.
+
+Both paths are fixed by setting `use_chat_completions_url_for_anthropic_messages: true`
+in your config (requires the fork at `brandonrc/litellm`, branch
+`feat/forward-x-api-key-as-upstream-api-key`). Without this setting, litellm
 sends requests to `/v1/responses` instead of `/v1/chat/completions`.
 
 **Connection refused**: Check the proxy is running and the `ANTHROPIC_BASE_URL`
@@ -247,9 +260,11 @@ truncated responses, check for reverse proxy timeout settings (nginx
   complex tool schemas with very long names (>64 chars) get truncated and
   mapped back. If you see tool-related errors, this may be the cause.
 
-- **Extended thinking**: Anthropic's thinking blocks are translated but the
-  fidelity depends on what the upstream OpenAI-compatible endpoint returns.
-  Open WebUI may not surface thinking content from Bedrock.
+- **Extended thinking**: Claude Code always sends `thinking` params. With
+  `drop_params: true`, these are silently dropped before reaching Open WebUI.
+  This means thinking/reasoning output from Bedrock will not be surfaced back
+  through this proxy path. If you need thinking content, the upstream endpoint
+  must support it natively.
 
 - **No proxy-level rate limiting without master key**: Without a master key,
   all rate limiting happens at the Open WebUI / Bedrock layer.
