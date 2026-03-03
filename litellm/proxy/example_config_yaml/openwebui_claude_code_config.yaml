@@ -16,13 +16,6 @@
 #      Bearer token to Open WebUI for authentication
 #   4. Open WebUI routes to the backend LLM provider
 #
-# IMPORTANT: You must also set this env var when starting the proxy:
-#   export LITELLM_USE_CHAT_COMPLETIONS_URL_FOR_ANTHROPIC_MESSAGES=True
-#
-# Without it, litellm routes OpenAI-provider requests to the Responses API
-# (/v1/responses) which Open WebUI does not support. This flag forces routing
-# through /v1/chat/completions instead.
-#
 # Engineer setup (Claude Code side):
 #   export ANTHROPIC_BASE_URL=https://litellm-proxy.internal.company.com
 #   export ANTHROPIC_API_KEY=<engineer's-open-webui-token>
@@ -37,22 +30,22 @@ model_list:
   # NOTE on api_base: The OpenAI SDK appends /chat/completions to api_base.
   # Open WebUI's OpenAI-compatible endpoint is at /api/v1/chat/completions,
   # so api_base must end with /api/v1 (not /api).
-  - model_name: claude-sonnet-4-20250514
-    litellm_params:
-      model: openai/claude-sonnet-4-20250514
-      api_base: https://openwebui.internal.company.com/api/v1
-      api_key: "placeholder"  # Overridden per-request by forwarded x-api-key
-  - model_name: claude-opus-4-20250514
-    litellm_params:
-      model: openai/claude-opus-4-20250514
-      api_base: https://openwebui.internal.company.com/api/v1
-      api_key: "placeholder"
-  # Wildcard: forward any claude model name
+  #
+  # NOTE on model name mapping: Open WebUI typically exposes models with a
+  # provider prefix (e.g. "anthropic.claude-sonnet-4-20250514"). The wildcard
+  # pattern below captures what Claude Code sends (e.g. "claude-sonnet-4-20250514")
+  # and maps it to the Open WebUI model name (e.g. "anthropic.claude-sonnet-4-20250514").
+  #
+  # Run this to see your Open WebUI model names:
+  #   curl -s https://openwebui.your-company.com/api/v1/models \
+  #     -H "Authorization: Bearer <token>" | python3 -m json.tool
+
+  # Wildcard: Claude Code sends "claude-*", Open WebUI expects "anthropic.claude-*"
   - model_name: claude-*
     litellm_params:
-      model: openai/claude-*
+      model: openai/anthropic.claude-*
       api_base: https://openwebui.internal.company.com/api/v1
-      api_key: "placeholder"
+      api_key: "placeholder"  # Overridden per-request by forwarded x-api-key
 
 general_settings:
   # Forward the client's x-api-key header as the API key for upstream calls.
@@ -62,5 +55,6 @@ general_settings:
 
 litellm_settings:
   # Force routing through /v1/chat/completions instead of /v1/responses.
-  # This can also be set via LITELLM_USE_CHAT_COMPLETIONS_URL_FOR_ANTHROPIC_MESSAGES env var.
+  # Without this, litellm routes openai-provider requests to the Responses API
+  # (/v1/responses) which Open WebUI does not support.
   use_chat_completions_url_for_anthropic_messages: true

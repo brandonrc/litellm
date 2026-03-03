@@ -40,10 +40,10 @@ Create a `config.yaml` for the litellm proxy:
 
 ```yaml
 model_list:
-  # Wildcard: any model name starting with "claude-" gets routed to Open WebUI
+  # Wildcard: Claude Code sends "claude-*", Open WebUI expects "anthropic.claude-*"
   - model_name: claude-*
     litellm_params:
-      model: openai/claude-*
+      model: openai/anthropic.claude-*
       api_base: https://openwebui.your-company.com/api/v1
       api_key: "placeholder"  # overridden per-request by the engineer's token
 
@@ -58,7 +58,8 @@ litellm_settings:
 
 | Setting | Why it's needed |
 |---------|-----------------|
-| `model: openai/claude-*` | The `openai/` prefix tells LiteLLM to send OpenAI-format requests upstream |
+| `model_name: claude-*` | Matches what Claude Code sends (e.g. `claude-sonnet-4-20250514`) |
+| `model: openai/anthropic.claude-*` | The `openai/` prefix tells LiteLLM to use OpenAI format. The `anthropic.` prefix maps to how Open WebUI names models. The `*` is substituted from the match (e.g. `sonnet-4-20250514`) |
 | `api_base: .../api/v1` | Open WebUI's OpenAI-compatible endpoint. The SDK appends `/chat/completions` to this, so it must end with `/api/v1` (not `/api`) |
 | `api_key: "placeholder"` | Required by LiteLLM schema but overridden per-request by the forwarded token |
 | `forward_llm_provider_auth_headers: true` | Forwards the client's `x-api-key` as the upstream API key (`Authorization: Bearer`) |
@@ -81,6 +82,22 @@ curl https://openwebui.your-company.com/api/v1/models \
   -H "Authorization: Bearer <your-token>"
 ```
 
+### Discovering your Open WebUI model names
+
+The model names in `model: openai/...` must match what Open WebUI exposes.
+Run this to find them:
+
+```bash
+curl -s https://openwebui.your-company.com/api/v1/models \
+  -H "Authorization: Bearer <your-token>" \
+  | python3 -c "import sys,json; [print(m['id']) for m in json.load(sys.stdin).get('data',[])]"
+```
+
+Common patterns:
+- `anthropic.claude-sonnet-4-20250514` -- use `model: openai/anthropic.claude-*`
+- `claude-sonnet-4-20250514` -- use `model: openai/claude-*`
+- `bedrock/claude-sonnet-4-20250514` -- use `model: openai/bedrock/claude-*`
+
 ### Specific models (alternative to wildcard)
 
 If you need to map specific model names:
@@ -89,12 +106,12 @@ If you need to map specific model names:
 model_list:
   - model_name: claude-sonnet-4-20250514
     litellm_params:
-      model: openai/claude-sonnet-4-20250514
+      model: openai/anthropic.claude-sonnet-4-20250514
       api_base: https://openwebui.your-company.com/api/v1
       api_key: "placeholder"
   - model_name: claude-opus-4-20250514
     litellm_params:
-      model: openai/claude-opus-4-20250514
+      model: openai/anthropic.claude-opus-4-20250514
       api_base: https://openwebui.your-company.com/api/v1
       api_key: "placeholder"
 
