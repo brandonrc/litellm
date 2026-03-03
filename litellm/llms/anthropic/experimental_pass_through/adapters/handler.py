@@ -47,6 +47,13 @@ class LiteLLMMessagesToCompletionTransformationHandler:
         Anthropic response format, we route the request through OpenAI's Responses API
         and request a reasoning summary.
         """
+        # When use_chat_completions_url_for_anthropic_messages is set, the
+        # caller has explicitly opted out of the Responses API path (e.g.
+        # because the upstream OpenAI-compatible endpoint does not support
+        # /v1/responses).  Honour that setting here as well.
+        if litellm.use_chat_completions_url_for_anthropic_messages:
+            return
+
         custom_llm_provider = completion_kwargs.get("custom_llm_provider")
         if custom_llm_provider is None:
             try:
